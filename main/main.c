@@ -11,6 +11,14 @@
 #include "driver/gpio.h"
 #include "esp_smartconfig.h"
 #include "esp_types.h"
+//#include "UdpServer.h"
+
+/* FreeRTOS Task Handle -------------------------------------------------------*/
+TaskHandle_t user_key_task_handle = NULL;
+
+/* FreeRTOS Semaphore Handle --------------------------------------------------*/
+SemaphoreHandle_t xUserKeySemaphore = NULL;
+
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t smartconfig_event_group = NULL;
@@ -23,6 +31,10 @@ static const char *TAG = "example";
 #define     LINKED_BIT      (BIT0)
 #define     CONNECTED_BIT   (BIT1)
 
+#define 	LED_GPIO_NUM	GPIO_NUM_25
+
+#define 	USER_KEY_GPIO_SEL	GPIO_SEL_0
+#define 	USER_KEY_GPIO_NUM	GPIO_NUM_0
 
 
 esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
@@ -82,7 +94,7 @@ static void smartconfig_done(smartconfig_status_t status, void *pdata)
                 uint8_t phone_ip[4] = {0};
 
                 memcpy(phone_ip, (uint8_t*)pdata, 4);
-                printf("Phone ip: %d.%d.%d.%d\n",phone_ip[0],phone_ip[1],phone_ip[2],phone_ip[3]);
+                ESP_LOGI(TAG,"Phone ip: %d.%d.%d.%d\n",phone_ip[0],phone_ip[1],phone_ip[2],phone_ip[3]);
             } else {
             	//SC_TYPE_AIRKISS - support airkiss v2.0
 //				airkiss_start_discover();
@@ -112,8 +124,114 @@ static void initialise_wifi(void)
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_start() );
 }
+/**
+	* @brief  no .    
+	* @note   no.
+	* @param  no.
+	* @retval no.
+	*/
+void user_key_task( void *pvParameters )
+{
+	vSemaphoreCreateBinary( xUserKeySemaphore );
+	xSemaphoreTake( xUserKeySemaphore , 20 / portTICK_PERIOD_MS );
+	
+	for( ;; )
+	{
+		if( xSemaphoreTake( xUserKeySemaphore, portMAX_DELAY) == pdTRUE )
+		{
+			printf( "user key gpio intr!\n" );
 
+			uint8_t i;
 
+			for( i = 0; i < 10 ; i++ )
+			{
+				vTaskDelay(500 / portTICK_PERIOD_MS);
+
+				if( gpio_get_level( USER_KEY_GPIO_NUM ) == 1 )
+				{
+					break;
+				}
+			}
+
+			if( i == 10 )										// °´¼ü°´ÏÂ5s.
+			{
+				esp_smartconfig_stop();
+				ESP_ERROR_CHECK( esp_smartconfig_set_type( SC_TYPE_ESPTOUCH ) );
+    			ESP_ERROR_CHECK( esp_smartconfig_start( smartconfig_done ) );
+			}
+		}
+		
+	}
+}
+/**
+    * @brief  no .    
+    * @note   no.
+    * @param  no.
+    * @retval no.
+    */
+void led_init( void )
+{
+	gpio_set_direction( LED_GPIO_NUM , GPIO_MODE_OUTPUT );
+}
+
+/**
+    * @brief  no .    
+    * @note   no.
+    * @param  no.
+    * @retval no.
+    */
+void led_task( void *pvParameters )
+{
+	int level = 0;
+	
+	for( ;; )
+	{
+        gpio_set_level( LED_GPIO_NUM , level);
+        level = !level;
+        vTaskDelay(300 / portTICK_PERIOD_MS);
+	}
+}
+
+/**
+    * @brief  no .    
+    * @note   no.
+    * @param  no.
+    * @retval no.
+    */
+void user_key_gpio_isr_handler(void* arg)
+{
+	static BaseType_t xHigherPriorityTaskWoken;
+	xHigherPriorityTaskWoken = pdFALSE;
+
+	if( xUserKeySemaphore != NULL )
+	{
+		xSemaphoreGiveFromISR( xUserKeySemaphore, &xHigherPriorityTaskWoken );
+	}
+	
+}
+
+/**
+    * @brief  no .    
+    * @note   no.
+    * @param  no.
+    * @retval no.
+    */
+void UserKeyInit( )
+{
+	gpio_config_t pGPIOConfig;
+
+	pGPIOConfig.pin_bit_mask = USER_KEY_GPIO_SEL;
+	pGPIOConfig.mode = GPIO_MODE_INPUT;
+	pGPIOConfig.pull_up_en = GPIO_PULLUP_DISABLE;
+	pGPIOConfig.intr_type = GPIO_INTR_NEGEDGE;
+
+	gpio_config( (gpio_config_t *)&pGPIOConfig );
+
+    //install gpio isr service
+    gpio_install_isr_service( ESP_INTR_FLAG_LEVEL1 );
+	//hook isr handler for specific gpio pin
+	gpio_isr_handler_add( USER_KEY_GPIO_NUM , user_key_gpio_isr_handler , (void *)USER_KEY_GPIO_NUM );
+}
 
 void app_main(void)
 {
@@ -121,16 +239,13 @@ void app_main(void)
 
     nvs_flash_init();
 	initialise_wifi();
+	UserKeyInit();
+	led_init();
 	
-	ESP_ERROR_CHECK( esp_smartconfig_set_type( SC_TYPE_ESPTOUCH ) );
-    ESP_ERROR_CHECK( esp_smartconfig_start(smartconfig_done ) );
+	xTaskCreate( &user_key_task, "user key task", 1024, NULL, 6, &user_key_task_handle );
+	configASSERT( user_key_task_handle );
 	
-    gpio_set_direction(GPIO_NUM_4, GPIO_MODE_OUTPUT);
-    int level = 0;
-    while (true) {
-        gpio_set_level(GPIO_NUM_4, level);
-        level = !level;
-        vTaskDelay(300 / portTICK_PERIOD_MS);
-    }
+	xTaskCreate( &led_task, "led task", 512, NULL, 5, NULL );
+//	UdpServerInit( );
 }
 
