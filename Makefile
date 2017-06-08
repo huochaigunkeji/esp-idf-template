@@ -6,5 +6,4 @@
 PROJECT_NAME := app-template
 
 include $(IDF_PATH)/make/project.mk
-INCLUDES := $(INCLUDES) -I $(PDIR)include
 

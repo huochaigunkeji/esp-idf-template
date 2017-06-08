@@ -8,10 +8,11 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+#include "main.h"
 #include "driver/gpio.h"
 #include "esp_smartconfig.h"
 #include "esp_types.h"
-//#include "UdpServer.h"
+#include "UdpServer.h"
 
 /* FreeRTOS Task Handle -------------------------------------------------------*/
 TaskHandle_t user_key_task_handle = NULL;
@@ -19,17 +20,12 @@ TaskHandle_t user_key_task_handle = NULL;
 /* FreeRTOS Semaphore Handle --------------------------------------------------*/
 SemaphoreHandle_t xUserKeySemaphore = NULL;
 
-
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
-static EventGroupHandle_t smartconfig_event_group = NULL;
+EventGroupHandle_t smartconfig_event_group = NULL;
+
 
 static const char *TAG = "example";
 
-/* The event group allows multiple bits for each event,
-   but we only care about one event - are we connected
-   to the AP with an IP? */
-#define     LINKED_BIT      (BIT0)
-#define     CONNECTED_BIT   (BIT1)
 
 #define 	LED_GPIO_NUM	GPIO_NUM_25
 
@@ -41,16 +37,18 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
-		xEventGroupWaitBits(smartconfig_event_group, LINKED_BIT, false, true, portMAX_DELAY);
+		xEventGroupWaitBits( smartconfig_event_group, LINKED_BIT, false, true, portMAX_DELAY );
         esp_wifi_connect();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
+		ESP_LOGI(TAG,"sta got ip\n");
+		xEventGroupSetBits( smartconfig_event_group, LINK_OVER_BIT );
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
            auto-reassociate. */
         esp_wifi_connect();
-		xEventGroupClearBits(smartconfig_event_group, CONNECTED_BIT);
+		xEventGroupClearBits( smartconfig_event_group, CONNECTED_BIT );
         break;
     default:
         break;
@@ -123,6 +121,16 @@ static void initialise_wifi(void)
 */	
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_start() );
+
+	wifi_config_t conf;
+	
+	esp_wifi_get_config( ESP_IF_WIFI_STA , &conf);
+
+	if( ( conf.sta.ssid[0] != '\0' ) && ( conf.sta.password[0] != '\0') )
+	{
+		xEventGroupSetBits(smartconfig_event_group, LINKED_BIT);	
+	}
+
 }
 /**
 	* @brief  no .    
@@ -246,6 +254,6 @@ void app_main(void)
 	configASSERT( user_key_task_handle );
 	
 	xTaskCreate( &led_task, "led task", 512, NULL, 5, NULL );
-//	UdpServerInit( );
+	UdpServerInit( );
 }
 

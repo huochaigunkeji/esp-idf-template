@@ -15,6 +15,7 @@
 #include "freertos/queue.h"
 #include "freertos/timers.h"
 
+#include "main.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "esp_types.h"
@@ -41,6 +42,8 @@ void UdpServerTask( void *pvParameters )
 	
 	int32_t nNetTimeout = 60000; 
 	char udp_msg[ UDP_DATA_LEN ];
+
+	xEventGroupWaitBits( smartconfig_event_group, LINK_OVER_BIT, false, true, portMAX_DELAY );
 		
 	sock_fd = socket( AF_INET , SOCK_DGRAM , 0 );
 
@@ -83,7 +86,7 @@ void UdpServerTask( void *pvParameters )
 			if( strcmp( udp_msg , "find ESP8266") == 0)
 			{
 //				strcpy( udp_msg , "I'm a ESP8266!");
-				sprintf( udp_msg , "I'm a ESP8266,MAC=%02X%02X%02X%02X%02X%02X" , Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5] );
+				sprintf( udp_msg , "I'm a ESP32 device,MAC=%02X%02X%02X%02X%02X%02X" , Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5] );
 			}
 
 			struct sockaddr_in *ClientAddr;
@@ -104,11 +107,10 @@ void UdpServerTask( void *pvParameters )
 	* @param  no.
 	* @retval no.
 	*/
-	
 void UdpServerInit( void )
 {
 
-	pvUdpServerThreadHandle = sys_thread_new( "UdpServerTask" ,  UdpServerTask , NULL, 384 , 4 );
+	pvUdpServerThreadHandle = sys_thread_new( "UdpServerTask" ,  UdpServerTask , NULL, 1024 , 4 );
 	if( pvUdpServerThreadHandle != NULL )
 	{
 		printf("Udp Server Created!\r\n"  );
