@@ -19,6 +19,7 @@
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "esp_types.h"
+#include "esp_wifi.h"
 
 
 #define UDP_DATA_LEN          100
@@ -43,6 +44,8 @@ void UdpServerTask( void *pvParameters )
 	int32_t nNetTimeout = 60000; 
 	char udp_msg[ UDP_DATA_LEN ];
 
+	esp_wifi_get_mac( ESP_IF_WIFI_STA , Mac );
+	
 	xEventGroupWaitBits( smartconfig_event_group, LINK_OVER_BIT, false, true, portMAX_DELAY );
 		
 	sock_fd = socket( AF_INET , SOCK_DGRAM , 0 );
@@ -83,17 +86,11 @@ void UdpServerTask( void *pvParameters )
 
 			printf("Udp server recive msg:%s\r\n" , udp_msg );
 
-			if( strcmp( udp_msg , "find ESP8266") == 0)
+			if( strcmp( udp_msg , "find ESP32") == 0)
 			{
-//				strcpy( udp_msg , "I'm a ESP8266!");
-				sprintf( udp_msg , "I'm a ESP32 device,MAC=%02X%02X%02X%02X%02X%02X" , Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5] );
+				sprintf( udp_msg , "I'm a ESP32 device,MAC=%02X%02X%02X%02X%02X%02X\r\n" , Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5] );
 			}
 
-			struct sockaddr_in *ClientAddr;
-
-			ClientAddr = (struct sockaddr_in * )&from;
-
-			printf( "DstPort:%d\r\n" , ClientAddr->sin_port );
 			sendto( sock_fd , (uint8_t *)udp_msg , strlen( udp_msg ) , 0 , (struct sockaddr *)&from , fromlen );
 		}
 	}
@@ -109,11 +106,10 @@ void UdpServerTask( void *pvParameters )
 	*/
 void UdpServerInit( void )
 {
-
-	pvUdpServerThreadHandle = sys_thread_new( "UdpServerTask" ,  UdpServerTask , NULL, 1024 , 4 );
+	pvUdpServerThreadHandle = sys_thread_new( "Udp Server Task" ,  UdpServerTask , NULL, 2048 , 4 );
 	if( pvUdpServerThreadHandle != NULL )
 	{
-		printf("Udp Server Created!\r\n"  );
+		printf("Udp Server thread is Created!\r\n"  );
 	}
 
 }

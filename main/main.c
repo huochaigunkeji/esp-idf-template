@@ -13,6 +13,7 @@
 #include "esp_smartconfig.h"
 #include "esp_types.h"
 #include "UdpServer.h"
+#include "TcpServer.h"
 
 /* FreeRTOS Task Handle -------------------------------------------------------*/
 TaskHandle_t user_key_task_handle = NULL;
@@ -201,7 +202,7 @@ void led_task( void *pvParameters )
 }
 
 /**
-    * @brief  no .    
+    * @brief  no.
     * @note   no.
     * @param  no.
     * @retval no.
@@ -224,7 +225,7 @@ void user_key_gpio_isr_handler(void* arg)
     * @param  no.
     * @retval no.
     */
-void UserKeyInit( )
+void UserKeyInit( void )
 {
 	gpio_config_t pGPIOConfig;
 
@@ -253,7 +254,8 @@ void app_main(void)
 	xTaskCreate( &user_key_task, "user key task", 1024, NULL, 6, &user_key_task_handle );
 	configASSERT( user_key_task_handle );
 	
-	xTaskCreate( &led_task, "led task", 512, NULL, 5, NULL );
+	xTaskCreate( &led_task, "led task", 512, NULL, 3, NULL );
 	UdpServerInit( );
+	TcpServerInit( );
 }
 
