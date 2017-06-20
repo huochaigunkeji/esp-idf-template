@@ -28,7 +28,9 @@ EventGroupHandle_t smartconfig_event_group = NULL;
 static const char *TAG = "example";
 
 
-#define 	LED_GPIO_NUM	GPIO_NUM_25
+//#define 	LED_GPIO_NUM	GPIO_NUM_25
+#define 	LED_GPIO_NUM	GPIO_NUM_4
+
 
 #define 	USER_KEY_GPIO_SEL	GPIO_SEL_0
 #define 	USER_KEY_GPIO_NUM	GPIO_NUM_0
